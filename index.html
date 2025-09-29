@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Email Sorter</title>
+  <title>Email Sorter by MrKarik</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <style>
@@ -11,10 +11,11 @@
     button { margin: 5px; padding: 10px 15px; }
     table { border-collapse: collapse; width: 100%; margin-top: 20px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    h2 { color: #2c3e50; }
   </style>
 </head>
 <body>
-  <h2>📧 Email Sorter</h2>
+  <h2>📧 Email Sorter by MrKarik</h2>
   <p>Paste your emails below (one per line) or upload a file:</p>
   
   <textarea id="emailInput" placeholder="example@gmail.com"></textarea><br>
@@ -25,14 +26,24 @@
   <div id="results"></div>
 
   <script>
-    // 30+ popular email providers
+    // Expanded list of 100 providers
     const providers = [
       "gmail.com","yahoo.com","outlook.com","hotmail.com","aol.com","icloud.com",
       "protonmail.com","zoho.com","gmx.com","yandex.com","mail.com","msn.com",
       "live.com","me.com","fastmail.com","tutanota.com","pm.me","comcast.net",
       "att.net","verizon.net","rocketmail.com","cox.net","charter.net",
       "optonline.net","earthlink.net","mac.com","bellsouth.net","shaw.ca",
-      "rogers.com","btinternet.com","virginmedia.com","sky.com","talktalk.net"
+      "rogers.com","btinternet.com","virginmedia.com","sky.com","talktalk.net",
+      "office365.com","outlook.office365.com","owa.com","zimbra.com","hushmail.com",
+      "inbox.com","lycos.com","rediffmail.com","web.de","163.com","126.com","qq.com",
+      "sina.com","yeah.net","naver.com","daum.net","hanmail.net","seznam.cz",
+      "centrum.cz","volny.cz","libero.it","tin.it","tiscali.it","alice.it","wanadoo.fr",
+      "orange.fr","laposte.net","free.fr","neuf.fr","sfr.fr","hotmail.co.uk","outlook.co.uk",
+      "yahoo.co.uk","yahoo.co.in","yahoo.co.jp","hotmail.fr","hotmail.de","outlook.de",
+      "hotmail.it","outlook.it","terra.com","bol.com.br","uol.com.br","ig.com.br","r7.com",
+      "globo.com","oi.com.br","bell.net","sympatico.ca","videotron.ca","hotmail.ca",
+      "outlook.ca","yahoo.ca","bt.com","plus.com","blueyonder.co.uk","ntlworld.com",
+      "virgin.net","eircom.net","telenet.be","skynet.be","planet.nl","hetnet.nl","zonnet.nl"
     ];
 
     let sorted = {};
