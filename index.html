@@ -1,279 +1,106 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Email Sorter — Client-side</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8">
+  <title>Email Sorter</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; margin: 28px; color:#111 }
-    h1 { font-size: 26px; margin-bottom: 8px }
-    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap }
-    textarea { width:100%; height:160px; padding:12px; font-family:monospace; font-size:13px; }
-    input[type=file] { font-size:14px }
-    button { padding:10px 14px; font-size:14px; cursor:pointer; border-radius:6px; border:1px solid #ccc; background:#f7f7f7 }
-    .controls { display:flex; gap:8px; margin-top:10px; margin-bottom:10px; }
-    .output { margin-top:14px; }
-    .provider-list { margin-top:10px; display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px; }
-    .provider-card { padding:10px; border:1px solid #eee; border-radius:8px; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.03) }
-    small { color:#555 }
-    .success { color: #0a6; font-weight:600 }
-    .error { color: #c40; font-weight:600 }
-    footer { margin-top:24px; font-size:13px; color:#666 }
-    label { display:flex; gap:6px; align-items:center; }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    textarea { width: 100%; height: 200px; }
+    button { margin: 5px; padding: 10px 15px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
   </style>
-
-  <!-- JSZip from CDN for client-side zipping -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.0/jszip.min.js"></script>
 </head>
 <body>
-  <h1>📧 Email Sorter (Client-side)</h1>
-  <p>Paste emails (one per line) or upload a <code>.txt</code> file with one email per line. Click <strong>Sort & Download ZIP</strong> to get a ZIP of provider text files.</p>
+  <h2>📧 Email Sorter</h2>
+  <p>Paste your emails below (one per line) or upload a file:</p>
+  
+  <textarea id="emailInput" placeholder="example@gmail.com"></textarea><br>
+  <input type="file" id="fileInput"><br>
+  <button onclick="sortEmails()">Sort Only</button>
+  <button onclick="downloadAll()">Download All as ZIP</button>
 
-  <label><strong>Paste emails</strong> (one per line)</label>
-  <textarea id="pasteArea" placeholder="alice@gmail.com&#10;bob@outlook.com&#10;..."></textarea>
+  <div id="results"></div>
 
-  <div style="margin-top:10px" class="row">
-    <label>
-      <strong>Or upload file</strong>
-      <input id="fileInput" type="file" accept=".txt" style="margin-left:10px">
-    </label>
-  </div>
+  <script>
+    // 30+ popular email providers
+    const providers = [
+      "gmail.com","yahoo.com","outlook.com","hotmail.com","aol.com","icloud.com",
+      "protonmail.com","zoho.com","gmx.com","yandex.com","mail.com","msn.com",
+      "live.com","me.com","fastmail.com","tutanota.com","pm.me","comcast.net",
+      "att.net","verizon.net","rocketmail.com","cox.net","charter.net",
+      "optonline.net","earthlink.net","mac.com","bellsouth.net","shaw.ca",
+      "rogers.com","btinternet.com","virginmedia.com","sky.com","talktalk.net"
+    ];
 
-  <div class="controls">
-    <button id="sortBtn">Sort & Download ZIP</button>
-    <button id="previewBtn">Preview Buckets</button>
-    <button id="clearBtn">Clear</button>
-    <label style="margin-left:auto">
-      <input id="dedupe" type="checkbox" checked> Remove duplicates
-    </label>
-  </div>
+    let sorted = {};
 
-  <div id="message"></div>
-
-  <div id="preview" class="output"></div>
-
-  <footer>
-    Tip: Save the produced ZIP and open it to see one text file per provider (e.g. <code>gmail.txt</code>). Domains not in the built-in map are grouped into <code>others.txt</code>.
-  </footer>
-
-<script>
-(() => {
-  // Provider mapping (domain -> provider file name)
-  const providerMap = {
-    "outlook.com": "office365",
-    "hotmail.com": "office365",
-    "live.com": "office365",
-    "office365.com": "office365",
-    "gmail.com": "gmail",
-    "googlemail.com": "gmail",
-    "yahoo.com": "yahoo",
-    "yahoo.co.uk": "yahoo",
-    "aol.com": "aol",
-    "godaddy.com": "godaddy",
-    "rackspace.com": "rackspace",
-    "qq.com": "qq",
-    "163.com": "netease",
-    "126.com": "netease",
-    "netease.com": "netease",
-    "263.net": "263",
-    "aliyun.com": "aliyun",
-    "sina.com": "sina",
-    "namecheap.com": "namecheap",
-    "networksolutions.com": "networksolutions",
-    "hinet.net": "hinet",
-    "hibox.biz": "hibox",
-    "hiworks.com": "hiworks",
-    "gobizkorea.com": "gobizkorea",
-    "synaq.com": "synaq",
-    "mweb.co.za": "mweb",
-    "ionos.com": "1and1_ionos",
-    "1and1.com": "1and1_ionos",
-    "yandex.com": "yandex",
-    "yandex.ru": "yandex"
-  };
-
-  const pasteArea = document.getElementById('pasteArea');
-  const fileInput = document.getElementById('fileInput');
-  const sortBtn = document.getElementById('sortBtn');
-  const previewBtn = document.getElementById('previewBtn');
-  const previewDiv = document.getElementById('preview');
-  const messageDiv = document.getElementById('message');
-  const clearBtn = document.getElementById('clearBtn');
-  const dedupeCheckbox = document.getElementById('dedupe');
-
-  // Email regex (practical, not perfect)
-  const emailRegex = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
-
-  function setMessage(text, cls = '') {
-    messageDiv.innerHTML = text ? `<div class="${cls}">${text}</div>` : '';
-  }
-
-  // Read file input if provided
-  async function readFileIfAny() {
-    const file = fileInput.files[0];
-    if (!file) return '';
-    return await file.text();
-  }
-
-  // Parse emails from a combined string
-  function parseEmails(text) {
-    if (!text) return [];
-    const found = text.match(emailRegex) || [];
-    // Trim and lowercase
-    return found.map(e => e.trim()).filter(Boolean);
-  }
-
-  function domainFromEmail(email) {
-    return email.split('@').pop().toLowerCase();
-  }
-
-  function classifyEmails(emails) {
-    const buckets = {};
-    for (const email of emails) {
-      const domain = domainFromEmail(email);
-      const provider = providerMap[domain] || 'others';
-      if (!buckets[provider]) buckets[provider] = [];
-      buckets[provider].push(email);
-    }
-    return buckets;
-  }
-
-  function dedupeArray(arr) {
-    return Array.from(new Set(arr));
-  }
-
-  // Build downloadable ZIP
-  async function buildAndDownloadZip(buckets) {
-    if (Object.keys(buckets).length === 0) {
-      setMessage('No emails to zip.', 'error');
-      return;
-    }
-
-    const zip = new JSZip();
-    for (const [provider, entries] of Object.entries(buckets)) {
-      if (!entries || entries.length === 0) continue;
-      const content = entries.join('\\n') + '\\n';
-      zip.file(`${provider}.txt`, content);
-    }
-
-    const blob = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sorted_emails.zip';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-
-    setMessage('✅ ZIP created and download started.', 'success');
-  }
-
-  function renderPreview(buckets) {
-    previewDiv.innerHTML = '';
-    if (!buckets || Object.keys(buckets).length === 0) {
-      previewDiv.innerHTML = '<small>No buckets to show.</small>';
-      return;
-    }
-
-    const container = document.createElement('div');
-    container.className = 'provider-list';
-    for (const [provider, entries] of Object.entries(buckets)) {
-      const card = document.createElement('div');
-      card.className = 'provider-card';
-      const title = document.createElement('div');
-      title.innerHTML = `<strong>${provider}.txt</strong> <small>(${entries.length})</small>`;
-      const pre = document.createElement('pre');
-      pre.style.whiteSpace = 'pre-wrap';
-      pre.style.fontSize = '12px';
-      pre.style.marginTop = '8px';
-      pre.textContent = entries.slice(0, 200).join('\\n'); // show up to 200 lines
-      card.appendChild(title);
-      card.appendChild(pre);
-
-      // download individual provider file button
-      const downloadBtn = document.createElement('button');
-      downloadBtn.textContent = 'Download';
-      downloadBtn.style.marginTop = '8px';
-      downloadBtn.onclick = () => {
-        const blob = new Blob([entries.join('\\n') + '\\n'], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${provider}.txt`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
+    document.getElementById("fileInput").addEventListener("change", function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        document.getElementById("emailInput").value = ev.target.result;
       };
-      card.appendChild(downloadBtn);
+      reader.readAsText(file);
+    });
 
-      container.appendChild(card);
+    function sortEmails() {
+      const emails = document.getElementById("emailInput").value
+        .split(/\r?\n/)
+        .map(e => e.trim().toLowerCase())
+        .filter(e => e.includes("@"));
+
+      sorted = {};
+      for (let provider of providers) {
+        sorted[provider] = [];
+      }
+      sorted["others"] = [];
+
+      emails.forEach(email => {
+        const domain = email.split("@")[1];
+        if (providers.includes(domain)) {
+          sorted[domain].push(email);
+        } else {
+          sorted["others"].push(email);
+        }
+      });
+
+      renderResults();
     }
-    previewDiv.appendChild(container);
-  }
 
-  // Main sorting flow
-  async function sortAndDownload() {
-    setMessage('Processing…');
-    previewDiv.innerHTML = '';
-
-    const fileText = await readFileIfAny();
-    const pastedText = pasteArea.value || '';
-    const combined = [fileText, pastedText].filter(Boolean).join('\\n');
-
-    const emails = parseEmails(combined);
-    if (emails.length === 0) {
-      setMessage('No valid email addresses found. Paste or upload a .txt file with one email per line.', 'error');
-      return;
+    function renderResults() {
+      let html = "<table><tr><th>Provider</th><th>Count</th><th>Download</th></tr>";
+      for (let provider in sorted) {
+        if (sorted[provider].length > 0) {
+          html += `<tr>
+            <td>${provider}</td>
+            <td>${sorted[provider].length}</td>
+            <td><button onclick="downloadProvider('${provider}')">Download</button></td>
+          </tr>`;
+        }
+      }
+      html += "</table>";
+      document.getElementById("results").innerHTML = html;
     }
 
-    const dedupe = dedupeCheckbox.checked;
-    const finalEmails = dedupe ? dedupeArray(emails.map(e => e.toLowerCase())) : emails.map(e => e.toLowerCase());
-    const buckets = classifyEmails(finalEmails);
-
-    // Optionally show preview first (keeps UI responsive)
-    renderPreview(buckets);
-
-    await buildAndDownloadZip(buckets);
-  }
-
-  previewBtn.addEventListener('click', async () => {
-    setMessage('');
-    previewDiv.innerHTML = '';
-    const fileText = await readFileIfAny();
-    const pastedText = pasteArea.value || '';
-    const combined = [fileText, pastedText].filter(Boolean).join('\\n');
-
-    const emails = parseEmails(combined);
-    if (emails.length === 0) {
-      setMessage('No valid email addresses to preview. Paste or upload a .txt file.', 'error');
-      return;
+    function downloadProvider(provider) {
+      const blob = new Blob([sorted[provider].join("\n")], { type: "text/plain;charset=utf-8" });
+      saveAs(blob, provider + ".txt");
     }
-    const dedupe = dedupeCheckbox.checked;
-    const finalEmails = dedupe ? dedupeArray(emails.map(e => e.toLowerCase())) : emails.map(e => e.toLowerCase());
-    const buckets = classifyEmails(finalEmails);
-    renderPreview(buckets);
-    setMessage(`Preview generated. ${finalEmails.length} emails grouped into ${Object.keys(buckets).length} buckets.`);
-  });
 
-  sortBtn.addEventListener('click', async () => {
-    try {
-      await sortAndDownload();
-    } catch (err) {
-      console.error(err);
-      setMessage('An error occurred while sorting. See console for details.', 'error');
+    async function downloadAll() {
+      const zip = new JSZip();
+      for (let provider in sorted) {
+        if (sorted[provider].length > 0) {
+          zip.file(provider + ".txt", sorted[provider].join("\n"));
+        }
+      }
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(content, "sorted_emails.zip");
     }
-  });
-
-  clearBtn.addEventListener('click', () => {
-    pasteArea.value = '';
-    fileInput.value = '';
-    previewDiv.innerHTML = '';
-    setMessage('');
-  });
-
-})();
-</script>
+  </script>
 </body>
 </html>
