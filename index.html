@@ -3,153 +3,169 @@
 <head>
   <meta charset="UTF-8">
   <title>Email Sorter by MrKarik</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    textarea { width: 100%; height: 200px; }
-    button { margin: 5px; padding: 10px 15px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    h2 { color: #2c3e50; }
-    .mode { margin: 10px 0; }
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+    h1 { text-align: center; }
+    #inputArea { width: 100%; height: 150px; margin-bottom: 15px; padding: 10px; }
+    button { padding: 10px 20px; cursor: pointer; }
+    .folder { background: white; padding: 10px; margin: 10px 0; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .folder h2 { margin: 0 0 10px 0; font-size: 16px; background: #0073e6; color: white; padding: 5px; border-radius: 4px; }
+    ul { margin: 0; padding-left: 20px; }
   </style>
 </head>
 <body>
-  <h2>📧 Email Sorter by MrKarik</h2>
-  <p>Paste your emails below (one per line) or upload a file:</p>
-  
-  <textarea id="emailInput" placeholder="example@gmail.com"></textarea><br>
-  <input type="file" id="fileInput"><br>
-
-  <div class="mode">
-    <label><input type="radio" name="mode" value="raw" checked> Raw (100 providers)</label>
-    <label><input type="radio" name="mode" value="grouped"> Grouped (Gmail, Yahoo, Office365, Owa, Roundcube, Others)</label>
-  </div>
-
-  <button onclick="sortEmails()">Sort Only</button>
-  <button onclick="downloadAll()">Download All as ZIP</button>
-
+  <h1>Email Sorter by MrKarik</h1>
+  <textarea id="inputArea" placeholder="Paste emails here..."></textarea><br>
+  <button onclick="sortEmails()">Sort Emails</button>
   <div id="results"></div>
 
   <script>
-    // Raw 100 providers list
-    const providers = [
-      "gmail.com","yahoo.com","outlook.com","hotmail.com","aol.com","icloud.com",
-      "protonmail.com","zoho.com","gmx.com","yandex.com","mail.com","msn.com",
-      "live.com","me.com","fastmail.com","tutanota.com","pm.me","comcast.net",
-      "att.net","verizon.net","rocketmail.com","cox.net","charter.net",
-      "optonline.net","earthlink.net","mac.com","bellsouth.net","shaw.ca",
-      "rogers.com","btinternet.com","virginmedia.com","sky.com","talktalk.net",
-      "office365.com","outlook.office365.com","owa.com","zimbra.com","hushmail.com",
-      "inbox.com","lycos.com","rediffmail.com","web.de","163.com","126.com","qq.com",
-      "sina.com","yeah.net","naver.com","daum.net","hanmail.net","seznam.cz",
-      "centrum.cz","volny.cz","libero.it","tin.it","tiscali.it","alice.it","wanadoo.fr",
-      "orange.fr","laposte.net","free.fr","neuf.fr","sfr.fr","hotmail.co.uk","outlook.co.uk",
-      "yahoo.co.uk","yahoo.co.in","yahoo.co.jp","hotmail.fr","hotmail.de","outlook.de",
-      "hotmail.it","outlook.it","terra.com","bol.com.br","uol.com.br","ig.com.br","r7.com",
-      "globo.com","oi.com.br","bell.net","sympatico.ca","videotron.ca","hotmail.ca",
-      "outlook.ca","yahoo.ca","bt.com","plus.com","blueyonder.co.uk","ntlworld.com",
-      "virgin.net","eircom.net","telenet.be","skynet.be","planet.nl","hetnet.nl","zonnet.nl"
-    ];
-
-    // Grouped families
-    const hostGroups = {
-      gmail: [
-        "gmail.com","googlemail.com","google.com","g-suite.com","workspace.google.com",
-        "alphabet.com","abc.xyz"
-      ],
-      yahoo: [
-        "yahoo.com","ymail.com","rocketmail.com","yahoo.co.uk","yahoo.co.in","yahoo.co.jp","yahoomail.com"
-      ],
-      office365: [
-        "outlook.com","hotmail.com","live.com","msn.com","office365.com","owa.com","exchange.com",
-        "outlook.office365.com","microsoft.com","hotmail.co.uk","outlook.co.uk","outlook.de","hotmail.de","outlook.it","hotmail.it"
-      ],
-      owa: ["owa.com","outlook.office365.com"],
-      roundcube: ["roundcube.net","zimbra.com"] // Roundcube/Zimbra group
+    // --- Provider Definitions ---
+    const providers = {
+      "Gmail": ["gmail.com", "googlemail.com", "gappssmtp.com", "gsuite.google.com"],
+      "Yahoo": ["yahoo.com", "ymail.com", "rocketmail.com", "yahoomail.com"],
+      "Office365": ["outlook.com", "hotmail.com", "live.com", "office365.com", "microsoft.com"],
+      "Owa": ["owa.company.com", "webmail.exchange.com"],
+      "Roundcube": ["roundcube.net", "mailroundcube.com"],
+      "Zimbra": ["zimbra.com", "zmailcloud.com"],
+      "ProtonMail": ["protonmail.com"],
+      "AOL": ["aol.com"],
+      "iCloud": ["icloud.com", "me.com", "mac.com"],
+      "GMX": ["gmx.com", "gmx.net"],
+      "Mail.com": ["mail.com"],
+      "Yandex": ["yandex.com", "yandex.ru"],
+      "Zoho": ["zoho.com"],
+      "Fastmail": ["fastmail.com"],
+      "Tutanota": ["tutanota.com"],
+      "Mail.ru": ["mail.ru"],
+      "Inbox.lv": ["inbox.lv"],
+      "Lycos": ["lycos.com"],
+      "Rediff": ["rediffmail.com"],
+      "163 Mail": ["163.com"],
+      "126 Mail": ["126.com"],
+      "Sina": ["sina.com"],
+      "Tencent QQ": ["qq.com"],
+      "Naver": ["naver.com"],
+      "Daum": ["daum.net"],
+      "Seznam": ["seznam.cz"],
+      "GMX.de": ["gmx.de"],
+      "Web.de": ["web.de"],
+      "Bluewin": ["bluewin.ch"],
+      "Orange": ["orange.fr"],
+      "Wanadoo": ["wanadoo.fr"],
+      "Libero": ["libero.it"],
+      "Tiscali": ["tiscali.it"],
+      "Vodafone": ["vodafone.it"],
+      "Alice": ["alice.it"],
+      "O2": ["o2.co.uk", "o2online.de"],
+      "BT": ["btinternet.com", "btopenworld.com"],
+      "Virgin": ["virginmedia.com"],
+      "Sky": ["sky.com"],
+      "TalkTalk": ["talktalk.net"],
+      "Plusnet": ["plus.net"],
+      "Comcast": ["comcast.net"],
+      "AT&T": ["att.net", "sbcglobal.net", "bellsouth.net"],
+      "Verizon": ["verizon.net"],
+      "Charter": ["charter.net"],
+      "Cox": ["cox.net"],
+      "Shaw": ["shaw.ca"],
+      "Rogers": ["rogers.com"],
+      "Bell": ["bell.net"],
+      "Telus": ["telus.net"],
+      "Sympatico": ["sympatico.ca"],
+      "Optus": ["optusnet.com.au"],
+      "BigPond": ["bigpond.com"],
+      "Hotmail.fr": ["hotmail.fr"],
+      "Outlook.de": ["outlook.de"],
+      "Outlook.co.uk": ["outlook.co.uk"],
+      "Live.ca": ["live.ca"],
+      "Mailfence": ["mailfence.com"],
+      "Runbox": ["runbox.com"],
+      "Posteo": ["posteo.de"],
+      "Hushmail": ["hushmail.com"],
+      "CounterMail": ["countermail.com"],
+      "StartMail": ["startmail.com"],
+      "LuxSci": ["luxsci.com"],
+      "Kolab Now": ["kolabnow.com"],
+      "Thexyz": ["thexyz.com"],
+      "Mailo": ["mailo.com"],
+      "Disroot": ["disroot.org"],
+      "Riseup": ["riseup.net"],
+      "OpenMailbox": ["openmailbox.org"],
+      "Safe-mail": ["safe-mail.net"],
+      "NeoMailBox": ["neomailbox.com"],
+      "Lavabit": ["lavabit.com"],
+      "GhostMail": ["ghostmail.com"],
+      "VFEmail": ["vfemail.net"],
+      "Cock.li": ["cock.li"],
+      "GMX.ch": ["gmx.ch"],
+      "Freemail.hu": ["freemail.hu"],
+      "Laposte": ["laposte.net"],
+      "In.com": ["in.com"],
+      "UK2": ["uk2.net"],
+      "Email.it": ["email.it"],
+      "EnaMail": ["ename.com"],
+      "Mail.bg": ["mail.bg"],
+      "Centrum": ["centrum.cz"],
+      "Interia": ["interia.pl"],
+      "Walla": ["walla.com"],
+      "NetZero": ["netzero.net"],
+      "Juno": ["juno.com"],
+      "PeoplePC": ["peoplepc.com"],
+      "EarthLink": ["earthlink.net"],
+      "CompuServe": ["compuserve.com"],
+      "MyWay": ["myway.com"],
+      "Excite": ["excite.com"],
+      "USA.com": ["usa.com"],
+      "Consultant.com": ["consultant.com"],
+      "Engineer.com": ["engineer.com"],
+      "Europe.com": ["europe.com"],
+      "Asia.com": ["asia.com"],
+      "Techie.com": ["techie.com"],
+      "Cheerful.com": ["cheerful.com"],
+      "Doctor.com": ["doctor.com"]
     };
 
-    let sorted = {};
-
-    document.getElementById("fileInput").addEventListener("change", function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(ev) {
-        document.getElementById("emailInput").value = ev.target.result;
-      };
-      reader.readAsText(file);
-    });
-
+    // --- Sorter Function ---
     function sortEmails() {
-      const mode = document.querySelector('input[name="mode"]:checked').value;
-      const emails = document.getElementById("emailInput").value
-        .split(/\r?\n/)
-        .map(e => e.trim().toLowerCase())
-        .filter(e => e.includes("@"));
+      const input = document.getElementById("inputArea").value.trim();
+      const emails = input.split(/\s+/).filter(e => e.includes("@"));
+      const results = {};
 
-      sorted = {};
+      emails.forEach(email => {
+        const domain = email.split("@")[1].toLowerCase();
+        let matchedProvider = null;
 
-      if (mode === "raw") {
-        for (let p of providers) sorted[p] = [];
-        sorted["others"] = [];
-        emails.forEach(email => {
-          const domain = email.split("@")[1];
-          if (providers.includes(domain)) {
-            sorted[domain].push(email);
-          } else {
-            sorted["others"].push(email);
+        for (const [provider, domains] of Object.entries(providers)) {
+          if (domains.some(d => domain.endsWith(d))) {
+            matchedProvider = provider;
+            break;
           }
-        });
-      } else { // grouped
-        sorted = { gmail: [], yahoo: [], office365: [], owa: [], roundcube: [], others: [] };
-        emails.forEach(email => {
-          const domain = email.split("@")[1];
-          let placed = false;
-          for (let group in hostGroups) {
-            if (hostGroups[group].includes(domain)) {
-              sorted[group].push(email);
-              placed = true;
-              break;
-            }
-          }
-          if (!placed) sorted.others.push(email);
-        });
-      }
-
-      renderResults();
-    }
-
-    function renderResults() {
-      let html = "<table><tr><th>Provider/Group</th><th>Count</th><th>Download</th></tr>";
-      for (let key in sorted) {
-        if (sorted[key].length > 0) {
-          html += `<tr>
-            <td>${key}</td>
-            <td>${sorted[key].length}</td>
-            <td><button onclick="downloadProvider('${key}')">Download</button></td>
-          </tr>`;
         }
+
+        // Auto-map Gmail/GSuite → Gmail, Yahoo-hosted → Yahoo, Microsoft-hosted → Office365
+        if (["gmail.com", "googlemail.com", "gappssmtp.com", "gsuite.google.com"].some(d => domain.endsWith(d))) {
+          matchedProvider = "Gmail";
+        } else if (["yahoo.com", "ymail.com", "rocketmail.com", "yahoomail.com"].some(d => domain.endsWith(d))) {
+          matchedProvider = "Yahoo";
+        } else if (["outlook.com", "hotmail.com", "live.com", "office365.com", "microsoft.com"].some(d => domain.endsWith(d))) {
+          matchedProvider = "Office365";
+        }
+
+        if (!matchedProvider) matchedProvider = "Other";
+
+        if (!results[matchedProvider]) results[matchedProvider] = [];
+        results[matchedProvider].push(email);
+      });
+
+      // Render results
+      let html = "";
+      for (const [provider, emails] of Object.entries(results)) {
+        html += `<div class="folder"><h2>${provider}</h2><ul>`;
+        emails.forEach(e => html += `<li>${e}</li>`);
+        html += "</ul></div>";
       }
-      html += "</table>";
       document.getElementById("results").innerHTML = html;
-    }
-
-    function downloadProvider(key) {
-      const blob = new Blob([sorted[key].join("\n")], { type: "text/plain;charset=utf-8" });
-      saveAs(blob, key + ".txt");
-    }
-
-    async function downloadAll() {
-      const zip = new JSZip();
-      for (let key in sorted) {
-        if (sorted[key].length > 0) {
-          zip.file(key + ".txt", sorted[key].join("\n"));
-        }
-      }
-      const content = await zip.generateAsync({ type: "blob" });
-      saveAs(content, "sorted_emails.zip");
     }
   </script>
 </body>
