@@ -136,9 +136,13 @@
       const rawEmails = input.split(/\s+/).filter(e => e.includes("@"));
       const emails = [...new Set(rawEmails.map(e => e.toLowerCase()))]; // deduplicate
       const results = {};
+      results["Bad Emails"] = []; // folder for rejected
 
       emails.forEach(email => {
-        if (!isValidEmail(email)) return; // skip bad emails
+        if (!isValidEmail(email)) {
+          results["Bad Emails"].push(email);
+          return;
+        }
 
         const domain = email.split("@")[1];
         let matchedProvider = "Other";
@@ -167,7 +171,7 @@
         </thead>
         <tbody>`;
       for (const [provider, list] of Object.entries(results)) {
-        totalCount += list.length;
+        totalCount += provider === "Bad Emails" ? 0 : list.length;
         html += `<tr>
           <td>${provider}</td>
           <td>${list.length}</td>
@@ -187,7 +191,7 @@
       const blob = new Blob([emails.join("\n")], { type: "text/plain" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = provider + ".txt";
+      link.download = provider.replace(/\s+/g, "_") + ".txt";
       link.click();
     }
   </script>
