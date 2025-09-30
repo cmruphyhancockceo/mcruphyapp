@@ -12,6 +12,7 @@
     table { border-collapse: collapse; width: 100%; margin-top: 20px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
     h2 { color: #2c3e50; }
+    .mode { margin: 10px 0; }
   </style>
 </head>
 <body>
@@ -20,13 +21,19 @@
   
   <textarea id="emailInput" placeholder="example@gmail.com"></textarea><br>
   <input type="file" id="fileInput"><br>
+
+  <div class="mode">
+    <label><input type="radio" name="mode" value="raw" checked> Raw (100 providers)</label>
+    <label><input type="radio" name="mode" value="grouped"> Grouped (Gmail, Yahoo, Office365, Owa, Roundcube, Others)</label>
+  </div>
+
   <button onclick="sortEmails()">Sort Only</button>
   <button onclick="downloadAll()">Download All as ZIP</button>
 
   <div id="results"></div>
 
   <script>
-    // Expanded list of 100 providers
+    // Raw 100 providers list
     const providers = [
       "gmail.com","yahoo.com","outlook.com","hotmail.com","aol.com","icloud.com",
       "protonmail.com","zoho.com","gmx.com","yandex.com","mail.com","msn.com",
@@ -46,6 +53,23 @@
       "virgin.net","eircom.net","telenet.be","skynet.be","planet.nl","hetnet.nl","zonnet.nl"
     ];
 
+    // Grouped families
+    const hostGroups = {
+      gmail: [
+        "gmail.com","googlemail.com","google.com","g-suite.com","workspace.google.com",
+        "alphabet.com","abc.xyz"
+      ],
+      yahoo: [
+        "yahoo.com","ymail.com","rocketmail.com","yahoo.co.uk","yahoo.co.in","yahoo.co.jp","yahoomail.com"
+      ],
+      office365: [
+        "outlook.com","hotmail.com","live.com","msn.com","office365.com","owa.com","exchange.com",
+        "outlook.office365.com","microsoft.com","hotmail.co.uk","outlook.co.uk","outlook.de","hotmail.de","outlook.it","hotmail.it"
+      ],
+      owa: ["owa.com","outlook.office365.com"],
+      roundcube: ["roundcube.net","zimbra.com"] // Roundcube/Zimbra group
+    };
+
     let sorted = {};
 
     document.getElementById("fileInput").addEventListener("change", function(e) {
@@ -59,37 +83,52 @@
     });
 
     function sortEmails() {
+      const mode = document.querySelector('input[name="mode"]:checked').value;
       const emails = document.getElementById("emailInput").value
         .split(/\r?\n/)
         .map(e => e.trim().toLowerCase())
         .filter(e => e.includes("@"));
 
       sorted = {};
-      for (let provider of providers) {
-        sorted[provider] = [];
-      }
-      sorted["others"] = [];
 
-      emails.forEach(email => {
-        const domain = email.split("@")[1];
-        if (providers.includes(domain)) {
-          sorted[domain].push(email);
-        } else {
-          sorted["others"].push(email);
-        }
-      });
+      if (mode === "raw") {
+        for (let p of providers) sorted[p] = [];
+        sorted["others"] = [];
+        emails.forEach(email => {
+          const domain = email.split("@")[1];
+          if (providers.includes(domain)) {
+            sorted[domain].push(email);
+          } else {
+            sorted["others"].push(email);
+          }
+        });
+      } else { // grouped
+        sorted = { gmail: [], yahoo: [], office365: [], owa: [], roundcube: [], others: [] };
+        emails.forEach(email => {
+          const domain = email.split("@")[1];
+          let placed = false;
+          for (let group in hostGroups) {
+            if (hostGroups[group].includes(domain)) {
+              sorted[group].push(email);
+              placed = true;
+              break;
+            }
+          }
+          if (!placed) sorted.others.push(email);
+        });
+      }
 
       renderResults();
     }
 
     function renderResults() {
-      let html = "<table><tr><th>Provider</th><th>Count</th><th>Download</th></tr>";
-      for (let provider in sorted) {
-        if (sorted[provider].length > 0) {
+      let html = "<table><tr><th>Provider/Group</th><th>Count</th><th>Download</th></tr>";
+      for (let key in sorted) {
+        if (sorted[key].length > 0) {
           html += `<tr>
-            <td>${provider}</td>
-            <td>${sorted[provider].length}</td>
-            <td><button onclick="downloadProvider('${provider}')">Download</button></td>
+            <td>${key}</td>
+            <td>${sorted[key].length}</td>
+            <td><button onclick="downloadProvider('${key}')">Download</button></td>
           </tr>`;
         }
       }
@@ -97,16 +136,16 @@
       document.getElementById("results").innerHTML = html;
     }
 
-    function downloadProvider(provider) {
-      const blob = new Blob([sorted[provider].join("\n")], { type: "text/plain;charset=utf-8" });
-      saveAs(blob, provider + ".txt");
+    function downloadProvider(key) {
+      const blob = new Blob([sorted[key].join("\n")], { type: "text/plain;charset=utf-8" });
+      saveAs(blob, key + ".txt");
     }
 
     async function downloadAll() {
       const zip = new JSZip();
-      for (let provider in sorted) {
-        if (sorted[provider].length > 0) {
-          zip.file(provider + ".txt", sorted[provider].join("\n"));
+      for (let key in sorted) {
+        if (sorted[key].length > 0) {
+          zip.file(key + ".txt", sorted[key].join("\n"));
         }
       }
       const content = await zip.generateAsync({ type: "blob" });
