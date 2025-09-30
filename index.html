@@ -1,36 +1,26 @@
-Perfect 👍 I’ll give you a **complete working HTML file** with:
-
-* Textarea + file upload.
-* Sort button.
-* Output = just folders with counts.
-* Download per folder.
-* Total emails count at the top.
-
-Here’s the full code:
-
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Email Sorter by MrKarik</title>
+  <title>Email Verifier & Sorter by MrKarik</title>
   <style>
     body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
     h1 { text-align: center; }
     #inputArea { width: 100%; height: 150px; margin-bottom: 15px; padding: 10px; }
-    button { padding: 8px 16px; cursor: pointer; margin: 5px; border-radius: 4px; border: none; background: #0073e6; color: white; }
+    button { padding: 6px 12px; cursor: pointer; border-radius: 4px; border: none; background: #0073e6; color: white; }
     button:hover { background: #005bb5; }
-    .folder { background: white; padding: 10px; margin: 10px 0; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-    .folder h2 { margin: 0; font-size: 16px; background: #0073e6; color: white; padding: 6px 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
-    .folder span { font-weight: normal; }
     #total { font-weight: bold; margin: 15px 0; font-size: 18px; text-align: center; }
+    table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); border-radius: 6px; overflow: hidden; }
+    th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: center; }
+    th { background: #0073e6; color: white; font-size: 16px; }
+    tr:hover { background: #f1f1f1; }
   </style>
 </head>
 <body>
-  <h1>Email Sorter by MrKarik</h1>
+  <h1>Email Verifier & Sorter by MrKarik</h1>
   <textarea id="inputArea" placeholder="Paste emails here..."></textarea><br>
   <input type="file" id="fileUpload" accept=".txt,.csv" onchange="uploadFile(event)">
-  <button onclick="sortEmails()">Sort Emails</button>
+  <button onclick="sortEmails()">Verify & Sort</button>
   <div id="total"></div>
   <div id="results"></div>
 
@@ -40,9 +30,6 @@ Here’s the full code:
       "Gmail": ["gmail.com", "googlemail.com"],
       "Yahoo": ["yahoo.com", "ymail.com", "rocketmail.com"],
       "Office365": ["outlook.com", "hotmail.com", "live.com", "office365.com", "microsoft.com"],
-      "Owa": ["owa.company.com", "webmail.exchange.com"],
-      "Roundcube": ["roundcube.net", "mailroundcube.com"],
-      "Zimbra": ["zimbra.com", "zmailcloud.com"],
       "ProtonMail": ["protonmail.com"],
       "AOL": ["aol.com"],
       "iCloud": ["icloud.com", "me.com", "mac.com"],
@@ -107,18 +94,16 @@ Here’s the full code:
       "Europe.com": ["europe.com"],
       "Asia.com": ["asia.com"],
       "Techie.com": ["techie.com"],
-      "Doctor.com": ["doctor.com"]
+      "Doctor.com": ["doctor.com"],
+      "Other": []
     };
 
-    // --- MX Record Mapping ---
-    const mxMapping = {
-      "google": "Gmail",
-      "yahoodns": "Yahoo",
-      "outlook": "Office365",
-      "hotmail": "Office365",
-      "office365": "Office365",
-      "microsoft": "Office365"
-    };
+    // --- Blacklist rules ---
+    const blacklistPrefixes = ["abuse", "postmaster", "webmaster", "noreply", "no-reply", "donotreply", "do-not-reply"];
+    const disposableDomains = ["10minutemail.com","guerrillamail.com","tempmail.com","mailinator.com","trashmail.com"];
+
+    // Regex for basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     // Upload file handler
     function uploadFile(event) {
@@ -131,7 +116,21 @@ Here’s the full code:
       reader.readAsText(file);
     }
 
-    // Sort Emails
+    // Email validation
+    function isValidEmail(email) {
+      if (!emailRegex.test(email)) return false; // invalid format
+      const [user, domain] = email.split("@");
+
+      // blacklist local parts
+      if (blacklistPrefixes.some(b => user.toLowerCase().startsWith(b))) return false;
+
+      // disposable domains
+      if (disposableDomains.some(d => domain.toLowerCase().includes(d))) return false;
+
+      return true;
+    }
+
+    // Sort & Verify Emails
     function sortEmails() {
       const input = document.getElementById("inputArea").value.trim();
       const rawEmails = input.split(/\s+/).filter(e => e.includes("@"));
@@ -139,10 +138,12 @@ Here’s the full code:
       const results = {};
 
       emails.forEach(email => {
-        const domain = email.split("@")[1];
-        let matchedProvider = null;
+        if (!isValidEmail(email)) return; // skip bad emails
 
-        // Direct domain match
+        const domain = email.split("@")[1];
+        let matchedProvider = "Other";
+
+        // Match provider
         for (const [provider, domains] of Object.entries(providers)) {
           if (domains.some(d => domain.endsWith(d))) {
             matchedProvider = provider;
@@ -150,38 +151,33 @@ Here’s the full code:
           }
         }
 
-        // MX detection (simulate by keyword in domain)
-        if (!matchedProvider) {
-          for (const [mxKey, provider] of Object.entries(mxMapping)) {
-            if (domain.includes(mxKey)) {
-              matchedProvider = provider;
-              break;
-            }
-          }
-        }
-
-        if (!matchedProvider) matchedProvider = "Other";
-
         if (!results[matchedProvider]) results[matchedProvider] = [];
         results[matchedProvider].push(email);
       });
 
-      // Render counts only
+      // Render table
       let totalCount = 0;
-      let html = "";
+      let html = `<table>
+        <thead>
+          <tr>
+            <th>Provider</th>
+            <th>Counts</th>
+            <th>Download</th>
+          </tr>
+        </thead>
+        <tbody>`;
       for (const [provider, list] of Object.entries(results)) {
         totalCount += list.length;
-        html += `<div class="folder">
-          <h2>
-            ${provider} <span>(${list.length})</span>
-            <button onclick="downloadFolder('${provider}')">Download</button>
-          </h2>
-        </div>`;
+        html += `<tr>
+          <td>${provider}</td>
+          <td>${list.length}</td>
+          <td><button onclick="downloadFolder('${provider}')">Download</button></td>
+        </tr>`;
       }
-      document.getElementById("total").innerText = "Total Emails: " + totalCount;
+      html += `</tbody></table>`;
+      document.getElementById("total").innerText = "Total Valid Emails: " + totalCount;
       document.getElementById("results").innerHTML = html;
 
-      // Save global results
       window.sortedResults = results;
     }
 
@@ -197,13 +193,3 @@ Here’s the full code:
   </script>
 </body>
 </html>
-```
-
----
-
-👉 This version will **not display any emails**, only:
-
-* A total count at the top.
-* Provider folders with `(count)` and download buttons.
-
-Do you also want a **“Download All”** button to export every email into one file?
